@@ -107,6 +107,7 @@
 #include "util/stop_watch.h"
 #include "util/string_util.h"
 #include "utilities/trace/replayer_impl.h"
+#include "utilities/merge_operators.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -1867,6 +1868,105 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
   SequenceNumber max_covering_tombstone_seq = 0;
 
   Status s;
+
+  bool done = false;
+  if (read_options.merge_mode > 0) {
+    s = Status::NotFound();
+    ReadOptions iteration_readoptions = read_options;
+    iteration_readoptions.merge_mode = 0;
+    iteration_readoptions.iterate_lower_bound = &key;
+    uint64_t cur_max_version = 0;
+    switch(read_options.merge_mode) {
+      case 1:
+      case 4:
+        {
+          std::string key_str(key.data(), key.size());
+          key_str += '\0';
+          std::lock_guard l(version_lock);
+          auto iter = merge_versions.find(key_str);
+          if (iter != merge_versions.end()) {
+            cur_max_version = iter->second;
+          }
+        }
+        break;
+      case 2:
+      case 5:
+        {
+          cur_max_version = unified_version;
+        }
+        break;
+      default:
+        assert(false);
+        break;
+    }
+    std::string upperbound_str(key.data(), key.size());
+
+    // 0 is invalid version number
+    if (cur_max_version > 0) {
+      upperbound_str += '\0';
+      upperbound_str += std::string("_v") + std::to_string(cur_max_version);
+    }
+    Slice upperbound(upperbound_str);
+    iteration_readoptions.iterate_upper_bound = &upperbound;
+    auto iter = NewIterator(iteration_readoptions,
+                            get_impl_options.column_family);
+    if (iter == nullptr) {
+      s = Status::NotFound();
+    } else {
+      static auto uint64_operator = MergeOperators::CreateUInt64AddOperator();
+      std::vector<Slice> operands;
+      for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
+        operands.push_back(iter->value());
+      }
+
+      const MergeOperator::MergeOperationInput merge_in(key, nullptr, operands,
+                                                        nullptr);
+      std::string result;
+      Slice result_operand(nullptr, 0);
+      MergeOperator::MergeOperationOutput merge_out(result, result_operand);
+      uint64_operator->FullMergeV2(merge_in, &merge_out);
+      *get_impl_options.value->GetSelf() = result_operand.ToString();
+      get_impl_options.value->PinSelf();
+      done = true;
+      s = Status::OK();
+      delete iter;
+    }
+    {
+      PERF_TIMER_GUARD(get_post_process_time);
+
+      RecordTick(stats_, NUMBER_KEYS_READ);
+      size_t size = 0;
+      if (s.ok()) {
+        if (get_impl_options.get_value) {
+          size = get_impl_options.value->size();
+        } else {
+          // Return all merge operands for get_impl_options.key
+          *get_impl_options.number_of_operands =
+            static_cast<int>(merge_context.GetNumOperands());
+          if (*get_impl_options.number_of_operands >
+              get_impl_options.get_merge_operands_options
+              ->expected_max_number_of_operands) {
+            s = Status::Incomplete(
+                Status::SubCode::KMergeOperandsInsufficientCapacity);
+          } else {
+            for (const Slice& sl : merge_context.GetOperands()) {
+              size += sl.size();
+              get_impl_options.merge_operands->PinSelf(sl);
+              get_impl_options.merge_operands++;
+            }
+          }
+        }
+        RecordTick(stats_, BYTES_READ, size);
+        PERF_COUNTER_ADD(get_read_bytes, size);
+      }
+      RecordInHistogram(stats_, BYTES_PER_READ, size);
+
+      ReturnAndCleanupSuperVersion(cfd, sv);
+    }
+
+    return s;
+  }
+
   // First look in the memtable, then in the immutable memtable (if any).
   // s is both in/out. When in, s could either be OK or MergeInProgress.
   // merge_operands will contain the sequence of merges in the latter case.
@@ -1875,7 +1975,6 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
 
   bool skip_memtable = (read_options.read_tier == kPersistedTier &&
                         has_unpersisted_data_.load(std::memory_order_relaxed));
-  bool done = false;
   std::string* timestamp =
       ucmp->timestamp_size() > 0 ? get_impl_options.timestamp : nullptr;
   if (!skip_memtable) {

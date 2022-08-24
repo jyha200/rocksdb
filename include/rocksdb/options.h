@@ -1549,6 +1549,7 @@ struct ReadOptions {
   // Default: false
   bool auto_prefix_mode;
 
+  int merge_mode;
   // Enforce that the iterator only iterates over the same prefix as the seek.
   // This option is effective only for prefix seeks, i.e. prefix_extractor is
   // non-null for the column family and total_order_seek is false.  Unlike

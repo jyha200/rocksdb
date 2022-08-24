@@ -178,6 +178,10 @@ class Directories {
 // divided in several db_impl_*.cc files, besides db_impl.cc.
 class DBImpl : public DB {
  public:
+  std::map<std::string, uint64_t> merge_versions;
+  std::atomic<uint64_t> unified_version;
+  std::mutex version_lock;
+
   DBImpl(const DBOptions& options, const std::string& dbname,
          const bool seq_per_batch = false, const bool batch_per_txn = true,
          bool read_only = false);

@@ -1694,6 +1694,7 @@ struct WriteOptions {
   // flush_before_backup=true to avoid losing unflushed memtable data.
   // Default: false
   bool disableWAL;
+  int merge_mode;
 
   // If true and if user is trying to write to column families that don't exist
   // (they were dropped),  ignore the write (don't return an error). If there
@@ -1749,6 +1750,7 @@ struct WriteOptions {
   WriteOptions()
       : sync(false),
         disableWAL(false),
+        merge_mode(0),
         ignore_missing_column_families(false),
         no_slowdown(false),
         low_pri(false),

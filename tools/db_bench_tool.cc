@@ -805,6 +805,7 @@ DEFINE_bool(sync, false, "Sync all writes to disk");
 DEFINE_bool(use_fsync, false, "If true, issue fsync instead of fdatasync");
 
 DEFINE_bool(disable_wal, false, "If true, do not write WAL for write.");
+DEFINE_int64(merge_mode, 0, "??");
 
 DEFINE_bool(manual_wal_flush, false,
             "If true, buffer WAL until buffer is full or a manual FlushWAL().");
@@ -3280,6 +3281,7 @@ class Benchmark {
         write_options_.sync = true;
       }
       write_options_.disableWAL = FLAGS_disable_wal;
+      write_options_.merge_mode = FLAGS_merge_mode;
       write_options_.rate_limiter_priority =
           FLAGS_rate_limit_auto_wal_flush ? Env::IO_USER : Env::IO_TOTAL;
       read_options_ = ReadOptions(FLAGS_verify_checksum, true);

@@ -39,6 +39,49 @@ Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
 
 Status DBImpl::Merge(const WriteOptions& o, ColumnFamilyHandle* column_family,
                      const Slice& key, const Slice& val) {
+  if (o.merge_mode > 0) {
+    uint64_t version = 0;
+    std::string key_str(key.data(), key.size());
+    key_str += '\0';
+    std::string version_str;
+    switch (o.merge_mode) {
+      case 1:
+      case 4:
+        {
+          std::lock_guard l(version_lock);
+          auto iter = merge_versions.find(key_str);
+          if (iter == merge_versions.end()) {
+            merge_versions[key_str] = 1;
+            version = 1;
+          } else {
+            iter->second++;
+            version = iter->second;
+          }
+          if (o.merge_mode == 1) {
+            version_str = std::string("_v") + std::to_string(version);
+          }
+        }
+        break;
+      case 2:
+      case 5:
+        {
+          version = ++unified_version;
+          if (o.merge_mode == 2) {
+            version_str = std::string("_v") + std::to_string(version);
+          }
+        }
+        break;
+      case 3:
+        break;
+      default:
+        assert(false);
+        break;
+    }
+    std::string versioned_key = key_str + version_str;
+    Slice versioned_key_slice(versioned_key);
+
+    return Put(o, column_family, versioned_key, val);
+  }
   const Status s = FailIfCfHasTs(column_family);
   if (!s.ok()) {
     return s;

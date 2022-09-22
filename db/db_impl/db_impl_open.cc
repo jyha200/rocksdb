@@ -292,7 +292,7 @@ Status DBImpl::NewDB(std::vector<std::string>* new_filenames) {
     std::unique_ptr<WritableFileWriter> file_writer(new WritableFileWriter(
         std::move(file), manifest, file_options, env_, io_tracer_,
         nullptr /* stats */, immutable_db_options_.listeners));
-    log::Writer log(std::move(file_writer), 0, false);
+    log::Writer log(std::move(file_writer), 0, false, false, immutable_db_options_.aligned_wal);
     std::string record;
     new_db.EncodeTo(&record);
     s = log.AddRecord(record);
@@ -1485,7 +1485,7 @@ IOStatus DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
         nullptr /* stats */, listeners));
     *new_log = new log::Writer(std::move(file_writer), log_file_num,
                                immutable_db_options_.recycle_log_file_num > 0,
-                               immutable_db_options_.manual_wal_flush);
+                               immutable_db_options_.manual_wal_flush, immutable_db_options_.aligned_wal);
   }
   return io_s;
 }

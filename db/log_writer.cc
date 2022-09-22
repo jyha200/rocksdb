@@ -19,12 +19,13 @@ namespace ROCKSDB_NAMESPACE {
 namespace log {
 
 Writer::Writer(std::unique_ptr<WritableFileWriter>&& dest, uint64_t log_number,
-               bool recycle_log_files, bool manual_flush)
+               bool recycle_log_files, bool manual_flush, bool aligned_wal)
     : dest_(std::move(dest)),
       block_offset_(0),
       log_number_(log_number),
       recycle_log_files_(recycle_log_files),
       manual_flush_(manual_flush) {
+  dest_->for_log = aligned_wal;
   for (int i = 0; i <= kMaxRecordType; i++) {
     char t = static_cast<char>(i);
     type_crc_[i] = crc32c::Value(&t, 1);
@@ -46,6 +47,33 @@ IOStatus Writer::Close() {
     dest_.reset();
   }
   return s;
+}
+
+char zero_pad[8192] = {0,};
+IOStatus Writer::Sync(bool use_fsync) {
+  IOStatus s;
+  if (dest_->for_log) {
+    auto in_block_size = block_offset_ % 4096;
+    int64_t pad_size = 0;
+    if (in_block_size > 0) {
+      pad_size = 4096 - in_block_size;
+    }
+
+    if (pad_size > 0) {
+      if (pad_size < kHeaderSize) {
+        s = dest_->Append(Slice("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+              static_cast<size_t>(pad_size)));
+        block_offset_ += pad_size;
+      } else {
+        s = EmitPhysicalRecord(kAlignment, zero_pad, pad_size - kHeaderSize);
+      }
+    }
+  }
+  if (s.ok()) {
+    return file()->Sync(use_fsync);
+  } else {
+    return s;
+  }
 }
 
 IOStatus Writer::AddRecord(const Slice& slice) {

@@ -26,12 +26,13 @@ enum RecordType {
   kFirstType = 2,
   kMiddleType = 3,
   kLastType = 4,
+  kAlignment = 5,
 
   // For recycled log files
-  kRecyclableFullType = 5,
-  kRecyclableFirstType = 6,
-  kRecyclableMiddleType = 7,
-  kRecyclableLastType = 8,
+  kRecyclableFullType = 6,
+  kRecyclableFirstType = 7,
+  kRecyclableMiddleType = 8,
+  kRecyclableLastType = 9,
 };
 static const int kMaxRecordType = kRecyclableLastType;
 

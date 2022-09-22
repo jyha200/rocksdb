@@ -34,6 +34,8 @@ class Statistics;
 // - Notify any interested listeners on the completion of a write.
 // - Update IO stats.
 class WritableFileWriter {
+ public:
+  bool for_log = false;
  private:
 #ifndef ROCKSDB_LITE
   void NotifyOnFileWriteFinish(

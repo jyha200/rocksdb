@@ -1196,6 +1196,8 @@ struct DBOptions {
   //
   // Default: hostname
   std::string db_host_id = kHostnameForDbHostId;
+
+  bool aligned_wal = false;
 };
 
 // Options to control the behavior of a database (passed to DB::Open)

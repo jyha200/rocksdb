@@ -73,7 +73,7 @@ class Writer {
   // "*dest" must remain live while this Writer is in use.
   explicit Writer(std::unique_ptr<WritableFileWriter>&& dest,
                   uint64_t log_number, bool recycle_log_files,
-                  bool manual_flush = false);
+                  bool manual_flush = false, bool aligned_wal = false);
   // No copying allowed
   Writer(const Writer&) = delete;
   void operator=(const Writer&) = delete;
@@ -84,6 +84,7 @@ class Writer {
 
   WritableFileWriter* file() { return dest_.get(); }
   const WritableFileWriter* file() const { return dest_.get(); }
+  IOStatus Sync(bool use_fsync);
 
   uint64_t get_log_number() const { return log_number_; }
 

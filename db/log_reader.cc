@@ -66,6 +66,8 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch,
     size_t drop_size = 0;
     const unsigned int record_type = ReadPhysicalRecord(&fragment, &drop_size);
     switch (record_type) {
+      case kAlignment:
+        break;
       case kFullType:
       case kRecyclableFullType:
         if (in_fragmented_record && !scratch->empty()) {
@@ -440,6 +442,8 @@ bool FragmentBufferedReader::ReadRecord(Slice* record, std::string* scratch,
   Slice fragment;
   while (TryReadFragment(&fragment, &drop_size, &fragment_type_or_err)) {
     switch (fragment_type_or_err) {
+      case kAlignment:
+        break;
       case kFullType:
       case kRecyclableFullType:
         if (in_fragmented_record_ && !fragments_.empty()) {

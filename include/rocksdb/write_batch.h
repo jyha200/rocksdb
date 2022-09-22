@@ -60,6 +60,7 @@ struct SavePoint {
 
 class WriteBatch : public WriteBatchBase {
  public:
+  bool concurrent_merge = false;
   explicit WriteBatch(size_t reserved_bytes = 0, size_t max_bytes = 0);
   explicit WriteBatch(size_t reserved_bytes, size_t max_bytes, size_t ts_sz);
   ~WriteBatch() override;

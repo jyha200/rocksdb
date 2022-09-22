@@ -1080,8 +1080,12 @@ Status WriteBatchInternal::Merge(WriteBatch* b, uint32_t column_family_id,
   }
   PutLengthPrefixedSlice(&b->rep_, key);
   PutLengthPrefixedSlice(&b->rep_, value);
+  ContentFlags flag = ContentFlags::HAS_MERGE;
+  if (b->concurrent_merge) {
+    flag = ContentFlags::HAS_PUT;
+  }
   b->content_flags_.store(b->content_flags_.load(std::memory_order_relaxed) |
-                              ContentFlags::HAS_MERGE,
+                              flag,
                           std::memory_order_relaxed);
   return save.commit();
 }

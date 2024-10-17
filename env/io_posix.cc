@@ -37,6 +37,8 @@
 #include "util/autovector.h"
 #include "util/coding.h"
 #include "util/string_util.h"
+#include <csignal>
+#include <unistd.h>
 
 #if defined(OS_LINUX) && !defined(F_SET_RW_HINT)
 #define F_LINUX_SPECIFIC_BASE 1024
@@ -119,6 +121,10 @@ bool PosixWrite(int fd, const char* buf, size_t nbyte) {
 
     ssize_t done = write(fd, src, bytes_to_write);
     if (done < 0) {
+      if (errno == EIO) {
+	      pid_t pid = getpid();
+	      kill(pid, SIGKILL);
+      }
       if (errno == EINTR) {
         continue;
       }
